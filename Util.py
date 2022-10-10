@@ -6,7 +6,7 @@ import numpy as np
 
 class HTMLNormalizer:
 
-    FILENAME_OF_DICT_LEMMA = "generate_lemma.txt"
+    FILENAME_OF_DICT_LEMMA = "generate.txt"
 
     def __init__(self, language='spanish', decode='utf-8'):
         self.language = language
@@ -63,6 +63,7 @@ class HTMLNormalizer:
             word = tokens[0]
             lemma = tokens[-1]
             dict_lemmas[word] = lemma
+            # dict_lemmas[(word, tag Regex)] = (lemma, tag)
 
         return dict_lemmas
 
@@ -108,6 +109,83 @@ class HTMLNormalizerSents(HTMLNormalizer):
 
     def lemmatize_sents(self, sents_tokenized):
         return [ super(HTMLNormalizerSents, self).lemmatize(sent) for sent in sents_tokenized]
+
+
+class HTMLNormalizerTagged(HTMLNormalizer):
+
+    TAG_NON_EXIST = 'unknown'
+    FILENAME_OF_DICT_LEMMA = "generate.txt"
+
+    def __init__(self, language='spanish', decode='utf-8'):
+        self.language = language
+        self.decode = decode
+        self.dict_lemmas = self.get_dict_from_file()
+        self.tagger = self.get_trained_tagger()
+        
+
+    def normalize_html(self, original_html):
+        html_raw_text = self.remove_tags(original_html)
+        tokens = self.get_tokens(html_raw_text)
+        tokens = self.remove_special_chars(tokens)
+        tokens = self.lower_tokens(tokens)
+        tokens = self.remove_stop_words(tokens)
+        tokens_tagged = self.tag_words_with_tagger(tokens)
+
+        lemmatized_tokens = self.lemmatize(tokens_tagged)
+        return lemmatized_tokens
+
+    def get_pattern_regex_tagger(self):
+        patterns = [
+            (r'^.*ez$', 'n'), # Ibanez, Chavez, Gutierrez, Gonzalez
+            (r'^.*ismo$', 'a'), # gigantismo, activismo
+            (r'^.*(ar|er|ir)$', 'v') # correr, activar, 
+        ]
+
+        return patterns
+
+    def get_trained_tagger(self):
+        train_data = nltk.corpus.cess_esp.tagged_sents()
+
+        patterns = self.get_pattern_regex_tagger()
+        backoff_tagger = nltk.RegexpTagger(patterns, nltk.DefaultTagger(self.TAG_NON_EXIST))
+
+        return nltk.UnigramTagger(train_data, None, backoff_tagger)
+
+    def tag_words_with_tagger(self, tokens):
+        tokens_tagged = self.tagger.tag(tokens)
+        tokens_tagged_norm = []
+        
+        for token, tag in tokens_tagged:
+            if tag != self.TAG_NON_EXIST:
+                tokens_tagged_norm.append((token, tag[0].lower()))
+            else:
+                tokens_tagged_norm.append((token, tag))
+
+        return tokens_tagged_norm
+
+
+    def get_dict_from_file(self):
+        file_generator = open( self.FILENAME_OF_DICT_LEMMA, mode='r', encoding='latin-1')
+
+        dict_lemmas = {}
+        for line in file_generator:
+            tokens = line.replace('#','').split()
+
+            if len(tokens) == 0:
+                continue
+            
+            word = tokens[0]
+            lemma = tokens[-1]    
+            tag = tokens[1][0].lower()
+
+
+            dict_lemmas[(word, tag)] = (lemma, tag)
+            # dict_lemmas[(word, tag Regex)] = (lemma, tag)
+
+        return dict_lemmas
+
+
+
 
 
 def getSimilars(vocabulary, contexts, word_target):
