@@ -1,5 +1,6 @@
 from Util import HTMLNormalizer
 import numpy as np
+import random
 
 def open_samples(encoding='utf-8'):
     NAME = 'SMS_Spam_Corpus_big.txt'
@@ -55,11 +56,56 @@ def getMatchs(H, Y):
     PRED = np.round(H)
 
     matchs = 0
-    for i in range(M):
+    for i in range(len(H)):
         if PRED[i] == Y[i]:
             matchs += 1
 
     return matchs
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def train_model(X, Y, N, it = 500):
+    M= len(X)
+
+    # INIT
+    THETA = np.random.random((N+1, 1))
+    Z = X.dot(THETA)
+    H = sigmoid(Z)
+
+
+    print("INITIAL: ")
+    print(J_THETA( np.ravel(H), np.ravel(Y) ))
+    print(f"Matchs: {getMatchs(H, Y)} / {M} \n")
+
+
+    LEARNING_RATE = 5
+    for it in range(it):
+
+        S = (LEARNING_RATE / M) * ( np.dot((H-Y).T, X) )
+        THETA = THETA - S.T
+        Z = X.dot(THETA)
+        H = sigmoid(Z)
+
+        if it % 20 == 0:
+            print(J_THETA( np.ravel(H), np.ravel(Y) ))
+
+    print("\nCOST AFTER TRAINING: ")
+    print(J_THETA( np.ravel(H), np.ravel(Y) ))
+
+
+    print(f"Matchs: {getMatchs(H, Y)} / {M} \n")
+
+    return THETA        
+
+
+def get_confusion_matrix(y_real, y_pred):
+    conf_mat = np.zeros((2,2))
+
+    for val_real, val_pred in zip(y_real, y_pred):
+        conf_mat[val_real][val_pred] += 1
+
+    return conf_mat
 
 
 
@@ -81,54 +127,60 @@ for text, category in classified:
 
 vocabulary = sorted(set( word for text, _ in classified_normalized for word in text ))
 
-M, N = len(samples), len(vocabulary)
+
 
 
 text_values = [text for text, _ in classified_normalized]
 
-Y = np.matrix([y for _, y in classified_normalized]).T
-X = get_matrix_X(text_values, vocabulary)
+
+
+samples_train = 800
+M, N = samples_train, len(vocabulary)
+
+
+random.shuffle(classified_normalized)
+
+Y_TRAIN = np.matrix([y for _, y in classified_normalized[:samples_train]]).T
+Y_TEST  = np.matrix([y for _, y in classified_normalized[samples_train:]]).T
+X_TRAIN = get_matrix_X([text for text, _ in classified_normalized[:samples_train]], vocabulary)
+X_TEST  = get_matrix_X([text for text, _ in classified_normalized[samples_train:]], vocabulary)
 
 
 
-sigmoid = lambda x: 1 / (1 + np.exp(-x))
+THETA = train_model(X_TRAIN, Y_TRAIN, N, 500)
 
 
-# INIT
-THETA = np.random.random((N+1, 1))
-Z = X.dot(THETA)
-H = sigmoid(Z)
+Z = X_TEST.dot(THETA)
+Y_PRED = np.round(sigmoid(Z)).astype(int)
 
 
-print("INITIAL: ")
-print(J_THETA( np.ravel(H), np.ravel(Y) ))
+CONF_MAT = get_confusion_matrix(np.ravel(Y_TEST), np.ravel(Y_PRED))
 
-
-print(f"Matchs: {getMatchs(H, Y)} / {M} \n")
-
-
-LEARNING_RATE = 5
-for it in range(100):
-
-    S = (LEARNING_RATE / M) * ( np.dot((H-Y).T, X) )
-    THETA = THETA - S.T
-    Z = X.dot(THETA)
-    H = sigmoid(Z)
-
-    if it % 20 == 0:
-        print(J_THETA( np.ravel(H), np.ravel(Y) ))
-    
+print("TOTAL SAMPLES TEST: ", len(Y_TEST), "\n")
+print("Confusion Matrix: ")
+print(CONF_MAT, "\n")
 
 
 
-print("\nFINAL: ")
-print(J_THETA( np.ravel(H), np.ravel(Y) ))
+# 0 is ham
+# 1 is spam
+TN, FN = CONF_MAT[0][0], CONF_MAT[0][1]
+FP, TP = CONF_MAT[1][0], CONF_MAT[1][1]
+
+specifity = TN / (TN + FP)
+precision = TP / (TP + FP)
+recall    = TP / (TP + FN)
+f_measure = precision * recall / (precision + recall)
+fallout   = FP / (FP + TN)
+accuracy  = (TP + TN) / (TP + TN + FP + FN)
 
 
-print(f"Matchs: {getMatchs(H, Y)} / {M} \n")
-
-
-
+print("Specifity: ", specifity)
+print("Precision: ", precision)
+print("Recall: "   , recall)
+print("F Measure: ", f_measure)
+print("Fallout: "  , fallout)
+print("Accuracy: " , accuracy)
 
 
 

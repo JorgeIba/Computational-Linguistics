@@ -13,13 +13,20 @@ class HTMLNormalizer:
         self.decode = decode
         self.dict_lemmas = self.get_dict_from_file()
 
-    def normalize_html(self, original_html):
-        html_raw_text = self.remove_tags(original_html)
+    def normalize_html(self, original, is_html=True, remove_spec_char=True, remove_stopwords=True):
+        html_raw_text = original
+        if is_html:
+            html_raw_text = self.remove_tags(original)
         tokens = self.get_tokens(html_raw_text)
-        tokens = self.remove_special_chars(tokens)
+
+        if remove_spec_char:
+            tokens = self.remove_special_chars(tokens)
+
         # tokens = self.supress_accents(tokens)
         tokens = self.lower_tokens(tokens)
-        tokens = self.remove_stop_words(tokens)
+        if remove_stopwords:
+            tokens = self.remove_stop_words(tokens)
+            
         lemmatized_tokens = self.lemmatize(tokens)
         return lemmatized_tokens
 
